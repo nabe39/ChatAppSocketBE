@@ -41,12 +41,34 @@ const userSchema = new mongoose.Schema({
   updateAt: {
     type: Date,
   },
+  verified: {
+    type: Boolean,
+    default: false,
+  },
+  otp: {
+    type: Number,
+  },
+  otp_expiry_time: {
+    type: Date,
+  },
+});
+userSchema.pre("save", async function (next) {
+  // Only run this function if OTP is actually modified
+  if (!this.isModified("otp")) return next();
+  //Hash the OTP with the cost of 12
+  this.otp = await brcypt.hash(this.otp, 12);
+  next();
 });
 
 userSchema.methods.correctPassword = async function () {
   canditatePassword, // 123456
     userPassword; // hash paswword
   return await brcypt.compare(canditatePassword, userPassword);
+};
+userSchema.methods.correctOTP = async function () {
+  canditateOTP, // 123456
+    userOTP; // hash paswword
+  return await brcypt.compare(canditateOTP, userOTP);
 };
 const User = new mongoose.model("User", userSchema);
 module.exports = User;
