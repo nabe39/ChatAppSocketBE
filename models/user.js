@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const brcypt = require("bcryptjs");
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const crypto = require("crypto");
 const userSchema = new mongoose.Schema({
   firstName: {
     type: String,
@@ -24,6 +25,9 @@ const userSchema = new mongoose.Schema({
     },
   },
   password: {
+    type: String,
+  },
+  passwordConfirm: {
     type: String,
   },
   passwordChangeAt: {
@@ -56,10 +60,17 @@ userSchema.pre("save", async function (next) {
   // Only run this function if OTP is actually modified
   if (!this.isModified("otp")) return next();
   //Hash the OTP with the cost of 12
-  this.otp = await brcypt.hash(this.otp, 12);
+  this.otp = await brcyptjs.hash(this.otp, 12);
   next();
 });
 
+userSchema.pre("save", async function (next) {
+  // Only run this function if OTP is actually modified
+  if (!this.isModified("password")) return next();
+  //Hash the OTP with the cost of 12
+  this.password = await brcyptjs.hash(this.password, 12);
+  next();
+});
 userSchema.methods.correctPassword = async function () {
   canditatePassword, // 123456
     userPassword; // hash paswword
@@ -70,5 +81,20 @@ userSchema.methods.correctOTP = async function () {
     userOTP; // hash paswword
   return await brcypt.compare(canditateOTP, userOTP);
 };
+
+userSchema.methods.createPasswordResetToken = function () {
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+
+  return resetToken;
+};
+userSchema.methods.changedPasswordAfter = function (timestamp) {
+  return timestamp < this.passwordChangeAt;
+};
+
 const User = new mongoose.model("User", userSchema);
 module.exports = User;
